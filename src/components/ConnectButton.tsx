@@ -26,6 +26,7 @@ export default function ConnectButton() {
     } catch {}
     try {
       localStorage.removeItem('wagmi.store');
+      localStorage.removeItem('injected.connected');
     } catch {}
   };
 
