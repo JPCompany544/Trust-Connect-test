@@ -19,7 +19,7 @@ const config = createConfig({
     injected(),
     ...(wcProjectId
       ? [
-          walletConnectUniversal({
+          (walletConnectUniversal({
             projectId: wcProjectId,
             metadata: {
               name: 'Connection Test',
@@ -27,7 +27,7 @@ const config = createConfig({
               url: typeof window !== 'undefined' ? window.location.origin : 'http://localhost',
               icons: ['https://avatars.githubusercontent.com/u/37784886?s=200&v=4'],
             },
-          }),
+          }) as any),
         ]
       : []),
   ],
