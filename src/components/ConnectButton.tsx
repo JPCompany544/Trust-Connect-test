@@ -61,25 +61,14 @@ export default function ConnectButton() {
         {isConnected ? 'Disconnect Wallet' : 'Connect Wallet'}
       </button>
 
+      {status === 'pending' && (
+        <p className="mt-3 text-sm text-gray-600">Waiting for approval...</p>
+      )}
+
       {isConnected && (
         <div className="mt-4 text-center">
           <p className="text-gray-700">Wallet Connected ✅</p>
           <p className="text-gray-500 mt-1">{shorten(address)}</p>
-        </div>
-      )}
-
-      {/* Overlay for WalletConnect deep-link pending */}
-      {status === 'pending' && variables && (variables as any).connector?.id === 'walletConnect' && (
-        <div className="fixed inset-0 bg-black/30 flex items-center justify-center">
-          <div className="bg-white rounded-xl p-6 shadow-xl text-center max-w-sm w-11/12">
-            <p className="text-gray-800 font-medium">Open Trust Wallet to approve connection</p>
-            <button
-              onClick={handleDisconnect}
-              className="mt-4 px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-800"
-            >
-              Cancel
-            </button>
-          </div>
         </div>
       )}
     </div>

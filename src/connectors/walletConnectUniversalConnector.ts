@@ -1,7 +1,7 @@
 import UniversalProvider from '@walletconnect/universal-provider'
-import type { Address, EIP1193Provider } from 'viem'
 import { createConnector } from '@wagmi/core'
 import { openDeepLink } from '../utils/mobileUtils'
+type Address = `0x${string}`
 
 /**
  * WalletConnect v2 Universal Provider connector for Wagmi v2
@@ -14,7 +14,7 @@ export function walletConnectUniversal(parameters: {
 }) {
   const { projectId, metadata } = parameters
 
-  return createConnector<EIP1193Provider, { wc?: any }>((config) => {
+  return createConnector((config) => {
     let provider: any | undefined
 
     async function ensureProvider() {
@@ -29,9 +29,17 @@ export function walletConnectUniversal(parameters: {
         },
       })
 
-      // Deep link on mobile when a URI is available
       provider.on?.('display_uri', (uri: string) => {
         try { openDeepLink(uri) } catch {}
+      })
+      provider.on?.('session_update', (args: any) => {
+        try {
+          const accounts = (args?.params?.namespaces?.eip155?.accounts ?? []).map((a: string) => a.split(':')[2]) as Address[]
+          if (accounts?.length) config.emitter.emit('change', { accounts: accounts as readonly Address[] })
+        } catch {}
+      })
+      provider.on?.('session_delete', () => {
+        try { config.emitter.emit('disconnect') } catch {}
       })
 
       return provider
@@ -52,15 +60,15 @@ export function walletConnectUniversal(parameters: {
 
       async getProvider() {
         const p = await ensureProvider()
-        return p as EIP1193Provider
+        return p as any
       },
 
-      async connect({ chainId }: { chainId?: number } = {}) {
+      async connect({ chainId }: { chainId?: number } = {}): Promise<any> {
         const p = await ensureProvider()
-        await clearPairings() // always fresh approval
+        await clearPairings()
 
         const chains = chainId ? [chainId] : config.chains.map((c) => c.id)
-        const namespaces = {
+        const requiredNamespaces = {
           eip155: {
             methods: [
               'eth_sendTransaction',
@@ -77,7 +85,20 @@ export function walletConnectUniversal(parameters: {
           },
         }
 
-        const session = await p.connect({ namespaces })
+        const connectPromise = p.connect({ namespaces: requiredNamespaces, requiredNamespaces } as any)
+        const raced = await Promise.race([
+          (async () => ({ ok: true as const, session: await connectPromise }))(),
+          new Promise((resolve) => setTimeout(() => resolve({ ok: false as const }), 60000)),
+        ])
+        if (!(raced as any).ok) {
+          try { await p.disconnect?.() } catch {}
+          try {
+            const pairings = p?.core?.pairing?.getPairings?.() ?? []
+            for (const pairing of pairings) await p.core.pairing.delete({ topic: pairing.topic })
+          } catch {}
+          throw new Error('Connection timed out')
+        }
+        const session = (raced as any).session
         const accounts = (session?.namespaces?.eip155?.accounts ?? []).map((a: string) => a.split(':')[2]) as Address[]
         const connectedChainId = (() => {
           const first = session?.namespaces?.eip155?.chains?.[0]
@@ -85,7 +106,7 @@ export function walletConnectUniversal(parameters: {
           return Number(first.split(':')[1])
         })()
 
-        return { accounts, chainId: connectedChainId }
+        return { accounts: accounts as readonly Address[], chainId: connectedChainId } as any
       },
 
       async disconnect() {
@@ -94,6 +115,18 @@ export function walletConnectUniversal(parameters: {
         try {
           const pairings = p?.core?.pairing?.getPairings?.() ?? []
           for (const pairing of pairings) await p.core.pairing.delete({ topic: pairing.topic })
+        } catch {}
+        try {
+          if (typeof localStorage !== 'undefined') {
+            try { localStorage.removeItem('wagmi.store') } catch {}
+            try { localStorage.removeItem('walletconnect') } catch {}
+            try { localStorage.removeItem('injected.connected') } catch {}
+            Object.keys(localStorage).forEach((k) => {
+              if (k.toLowerCase().includes('walletconnect') || k.toLowerCase().includes('wc@')) {
+                try { localStorage.removeItem(k) } catch {}
+              }
+            })
+          }
         } catch {}
       },
 
@@ -114,7 +147,7 @@ export function walletConnectUniversal(parameters: {
       },
 
       onAccountsChanged(accounts: string[]) {
-        config.emitter.emit('change', { accounts: accounts as Address[] })
+        config.emitter.emit('change', { accounts: accounts as readonly Address[] })
         if (accounts.length === 0) config.emitter.emit('disconnect')
       },
 

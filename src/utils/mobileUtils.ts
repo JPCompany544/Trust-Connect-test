@@ -24,6 +24,10 @@ export function openDeepLink(uri: string) {
   try {
     // Prefer assign to replace current context on iOS Safari
     window.location.assign(uri);
+    // Fallback: try forcing same-tab navigation shortly after if not handled
+    setTimeout(() => {
+      try { window.open(uri, '_self') } catch {}
+    }, 500);
   } catch {
     try { window.location.href = uri } catch { window.open(uri, '_self'); }
   }
