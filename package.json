@@ -12,6 +12,7 @@
     "@types/jest": "^27.5.2",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
+    "@walletconnect/universal-provider": "^2.22.4",
     "ethers": "^6.15.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
